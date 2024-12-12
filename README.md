@@ -64,3 +64,14 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+forge create --rpc-url https://eth-sepolia.g.alchemy.com/v2/IIzRcx7GwPPTndcgjPigYZcCD83wVwPU \
+--private-key 838216c216dfc7b7a3eaea02253b134b9b40443fa549346ee3bc980d6ce9fbe8 \
+--etherscan-api-key QKTGNT6NHAKZ1NA9WZ5JVAPB5AZH2MXUPE \
+--constructor-args 'Hello' \
+--verify --broadcast \
+src/UlaloDataStore.sol:UlaloDataStore
+
+forge create --rpc-url https://eth-sepolia.g.alchemy.com/v2/IIzRcx7GwPPTndcgjPigYZcCD83wVwPU --private-key 838216c216dfc7b7a3eaea02253b134b9b40443fa549346ee3bc980d6ce9fbe8 --etherscan-api-key QKTGNT6NHAKZ1NA9WZ5JVAPB5AZH2MXUPE --constructor-args 'Hello' src/UlaloDataStore.sol:UlaloDataStore  --verify --broadcast
+
+forge build && forge test && forge create --rpc-url https://eth-sepolia.g.alchemy.com/v2/IIzRcx7GwPPTndcgjPigYZcCD83wVwPU --private-key 838216c216dfc7b7a3eaea02253b134b9b40443fa549346ee3bc980d6ce9fbe8 --etherscan-api-key QKTGNT6NHAKZ1NA9WZ5JVAPB5AZH2MXUPE src/UlaloDataStore.sol:UlaloDataStore  --verify --broadcast  --constructor-args "Hello"

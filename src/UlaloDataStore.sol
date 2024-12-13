@@ -17,41 +17,66 @@ contract UlaloDataStore {
 
     event UpdatedMessages(string oldStr, string newStr);
 
-    // Mapping to store multiple CIDs for each address
-    mapping(address => string[]) private userCIDs;
+    // Struct to store file details
+    struct FileDetails {
+        string cid;
+        string fileName;
+        string fileType;
+    }
 
-    // Event emitted whenever a new CID is stored
-    event CIDStored(address indexed user, string cid);
+    // Mapping to store multiple file details for each address
+    mapping(address => FileDetails[]) private userFiles;
+
+    // Event emitted whenever a new file is stored
+    event FileStored(address indexed user, string cid, string fileName, string fileType);
 
     /**
      * @dev Stores the given CID for the sender's address.
      * @param cid The IPFS CID to store.
+     * @param fileName The name of the file.
+     * @param fileType The type of the file (e.g., PDF, JPEG).
      */
-    function store(string memory cid) public {
+    function storeFile(string memory cid, string memory fileName, string memory fileType) public {
         require(bytes(cid).length > 0, "CID cannot be empty");
-        userCIDs[msg.sender].push(cid);
-        emit CIDStored(msg.sender, cid);
+        require(bytes(fileName).length > 0, "File name cannot be empty");
+        require(bytes(fileType).length > 0, "File type cannot be empty");
+
+        userFiles[msg.sender].push(FileDetails({
+            cid: cid,
+            fileName: fileName,
+            fileType: fileType
+        }));
+
+        emit FileStored(msg.sender, cid, fileName, fileType);
     }
 
     /**
-     * @dev Stores the given CID for the sender's address and user address.
+     * @dev Stores the given CID for a specific user address.
      * @param userAddress The address of the user.
      * @param cid The IPFS CID to store.
+     * @param fileName The name of the file.
+     * @param fileType The type of the file (e.g., PDF, JPEG).
      */
-    function storeCID(address userAddress, string memory cid) public {
+    function storeFileForUser(address userAddress, string memory cid, string memory fileName, string memory fileType) public {
         require(bytes(cid).length > 0, "CID cannot be empty");
-        userCIDs[userAddress].push(cid);
-        emit CIDStored(userAddress, cid);
-    }
+        require(bytes(fileName).length > 0, "File name cannot be empty");
+        require(bytes(fileType).length > 0, "File type cannot be empty");
 
+        userFiles[userAddress].push(FileDetails({
+            cid: cid,
+            fileName: fileName,
+            fileType: fileType
+        }));
+
+        emit FileStored(userAddress, cid, fileName, fileType);
+    }
 
     /**
-     * @dev Retrieves all CIDs associated with the given address.
-     * @param user The address of the user whose CIDs are to be retrieved.
-     * @return An array of CIDs stored by the user.
+     * @dev Retrieves all file details associated with the given address.
+     * @param user The address of the user whose files are to be retrieved.
+     * @return An array of FileDetails stored by the user.
      */
-    function getCIDs(address user) public view returns (string[] memory) {
-        return userCIDs[user];
+    function getFiles(address user) public view returns (FileDetails[] memory) {
+        return userFiles[user];
     }
-
 }

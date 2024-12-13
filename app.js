@@ -11,15 +11,14 @@ const RPC_URL = process.env.API_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
-// Contract ABI (from compilation output or etherscan)
+// Contract ABI (updated to match the new contract)
 const CONTRACT_ABI = [
     "event UpdatedMessages(string oldStr, string newStr)",
-    "event CIDStored(address user, string cid)",
-    "event CIStore(address indexed user, string cid)",
+    "event FileStored(address indexed user, string cid, string fileName, string fileType)",
     "function update(string memory newMessage) public",
-    "function store(string memory cid) public",
-    "function storeCID(address user, string memory cid) public",
-    "function getCIDs(address user) public view returns (string[] memory)",
+    "function storeFile(string memory cid, string memory fileName, string memory fileType) public",
+    "function storeFileForUser(address userAddress, string memory cid, string memory fileName, string memory fileType) public",
+    "function getFiles(address user) public view returns (tuple(string cid, string fileName, string fileType)[] memory)",
 ];
 
 // Set up ethers.js
@@ -47,28 +46,46 @@ app.post("/updateMessage", async (req, res) => {
     }
 });
 
-// Store CID
-app.post("/storeCID", async (req, res) => {
-    const { cid, address } = req.body;
+// Store File for Sender
+app.post("/save", async (req, res) => {
+    const { cid, fileName, fileType } = req.body;
     try {
-        const tx = await contract.storeCID(address, cid);
+        const tx = await contract.storeFile(cid, fileName, fileType);
         await tx.wait(); // Wait for confirmation
-        res.status(200).send({ message: "CID stored successfully", txHash: tx.hash });
+        res.status(200).send({ message: "File stored successfully", txHash: tx.hash });
     } catch (err) {
         console.error(err);
-        res.status(500).send({ error: "Failed to store CID" });
+        res.status(500).send({ error: "Failed to store file" });
     }
 });
 
-// Get CIDs for a user
-app.get("/getCIDs/:address", async (req, res) => {
-    const { address } = req.params;
+// Store File for Specific User
+app.post("/store", async (req, res) => {
+    const { userAddress, cid, fileName, fileType } = req.body;
     try {
-        const cids = await contract.getCIDs(address);
-        res.status(200).send({ address, cids });
+        const tx = await contract.storeFileForUser(userAddress, cid, fileName, fileType);
+        await tx.wait(); // Wait for confirmation
+        res.status(200).send({ message: "File stored successfully for user", txHash: tx.hash });
     } catch (err) {
         console.error(err);
-        res.status(500).send({ error: "Failed to retrieve CIDs" });
+        res.status(500).send({ error: "Failed to store file for user" });
+    }
+});
+
+// Get Files for a User
+app.get("/get/:address", async (req, res) => {
+    const { address } = req.params;
+    try {
+        const files = await contract.getFiles(address);
+        const fileDetails = files.map(([cid, fileName, fileType]) => ({
+            cid,
+            fileName,
+            fileType,
+        }));
+        res.status(200).send({ address, files: fileDetails });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to retrieve files" });
     }
 });
 

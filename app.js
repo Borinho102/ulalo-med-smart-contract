@@ -1,96 +1,112 @@
-// app.js
+// Import required modules
 require("dotenv").config();
-const express = require("express");
-const { ethers } = require("ethers");
-
-const app = express();
-app.use(express.json());
+const express = require('express');
+const { ethers } = require('ethers');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 
 // Load environment variables
 const RPC_URL = process.env.API_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
-// Contract ABI (updated to match the new contract)
-const CONTRACT_ABI = [
+// Initialize Express app
+const app = express();
+const port = 3000;
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Contract details
+const ABI = [
     "event UpdatedMessages(string oldStr, string newStr)",
     "event FileStored(address indexed user, string cid, string fileName, string fileType)",
-    "function update(string memory newMessage) public",
-    "function storeFile(string memory cid, string memory fileName, string memory fileType) public",
-    "function storeFileForUser(address userAddress, string memory cid, string memory fileName, string memory fileType) public",
-    "function getFiles(address user) public view returns (tuple(string cid, string fileName, string fileType)[] memory)",
+    "function message() view returns (string)",
+    "function update(string newMessage)",
+    "function storeFile(string cid, string fileName, string fileType)",
+    "function storeFileForUser(address userAddress, string cid, string fileName, string fileType)",
+    "function getFiles(address user) view returns (tuple(string cid, string fileName, string fileType)[])",
 ];
 
+// Connect to Ethereum network (use Infura, Alchemy, or a local node)
 // Set up ethers.js
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
+const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
-// API Routes
+// API endpoints
 
-// Health Check
-app.get("/", (req, res) => {
-    res.send("UlaloDataStore API is running.");
+// Get the current message
+app.get('/message', async (req, res) => {
+    try {
+        const message = await contract.message();
+        res.json({ message });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// Update Message
-app.post("/updateMessage", async (req, res) => {
-    const { newMessage } = req.body;
+// Update the message
+app.post('/message', async (req, res) => {
     try {
+        const { newMessage } = req.body;
+        if (!newMessage) {
+            return res.status(400).json({ error: 'newMessage is required' });
+        }
+
         const tx = await contract.update(newMessage);
-        await tx.wait(); // Wait for confirmation
-        res.status(200).send({ message: "Message updated successfully", txHash: tx.hash });
+        await tx.wait();
+        res.json({ transactionHash: tx.hash });
     } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to update message" });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Store File for Sender
-app.post("/save", async (req, res) => {
-    const { cid, fileName, fileType } = req.body;
+// Store a file
+app.post('/save', async (req, res) => {
     try {
+        const { cid, fileName, fileType } = req.body;
+        if (!cid || !fileName || !fileType) {
+            return res.status(400).json({ error: 'cid, fileName, and fileType are required' });
+        }
+
         const tx = await contract.storeFile(cid, fileName, fileType);
-        await tx.wait(); // Wait for confirmation
-        res.status(200).send({ message: "File stored successfully", txHash: tx.hash });
+        await tx.wait();
+        res.json({ transactionHash: tx.hash });
     } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to store file" });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Store File for Specific User
-app.post("/store", async (req, res) => {
-    const { userAddress, cid, fileName, fileType } = req.body;
+// Store a file for a specific user
+app.post('/store', async (req, res) => {
     try {
+        const { userAddress, cid, fileName, fileType } = req.body;
+        if (!userAddress || !cid || !fileName || !fileType) {
+            return res.status(400).json({ error: 'userAddress, cid, fileName, and fileType are required' });
+        }
+
         const tx = await contract.storeFileForUser(userAddress, cid, fileName, fileType);
-        await tx.wait(); // Wait for confirmation
-        res.status(200).send({ message: "File stored successfully for user", txHash: tx.hash });
+        await tx.wait();
+        res.json({ transactionHash: tx.hash });
     } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to store file for user" });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Get Files for a User
-app.get("/get/:address", async (req, res) => {
-    const { address } = req.params;
+// Get files for a user
+app.get('/data/:userAddress', async (req, res) => {
     try {
-        const files = await contract.getFiles(address);
-        const fileDetails = files.map(([cid, fileName, fileType]) => ({
-            cid,
-            fileName,
-            fileType,
-        }));
-        res.status(200).send({ address, files: fileDetails });
+        const { userAddress } = req.params;
+        const files = await contract.getFiles(userAddress);
+        res.json({ files });
     } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to retrieve files" });
+        res.status(500).json({ error: err.message });
     }
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
 });

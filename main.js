@@ -1,34 +1,79 @@
-const Web3 = require('web3');
+// app.js
+require("dotenv").config();
+const express = require("express");
+const { ethers } = require("ethers");
 
-// Replace with your Infura project ID or other RPC provider
-const web3 = new Web3('https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID');
+const app = express();
+app.use(express.json());
 
-// Contract ABI (replace with the actual ABI of your contract)
-const contractABI = [
-    // ... your contract's ABI
+// Load environment variables
+const RPC_URL = process.env.API_URL;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+
+// Contract ABI (from compilation output or etherscan)
+const CONTRACT_ABI = [
+    "event UpdatedMessages(string oldStr, string newStr)",
+    "event CIDStored(address user, string cid)",
+    "event CIStore(address indexed user, string cid)",
+    "function update(string memory newMessage) public",
+    "function store(string memory cid) public",
+    "function storeCID(address user, string memory cid) public",
+    "function getCIDs(address user) public view returns (string[] memory)",
 ];
 
-// Contract address (replace with the deployed contract address)
-const contractAddress = '0xYOUR_CONTRACT_ADDRESS';
+// Set up ethers.js
+const provider = new ethers.JsonRpcProvider(RPC_URL);
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
 
-const contract = new web3.eth.Contract(contractABI, contractAddress);
+// API Routes
 
-// Function to store a CID
-async function storeCID(userAddress, cid) {
-    const accounts = await web3.eth.getAccounts();
-    const senderAddress = accounts[0];
+// Health Check
+app.get("/", (req, res) => {
+    res.send("UlaloDataStore API is running.");
+});
 
-    const transaction = await contract.methods.storeCID(userAddress, cid).send({ from: senderAddress });
-    console.log('CID stored:', transaction.transactionHash);
-}
+// Update Message
+app.post("/updateMessage", async (req, res) => {
+    const { newMessage } = req.body;
+    try {
+        const tx = await contract.update(newMessage);
+        await tx.wait(); // Wait for confirmation
+        res.status(200).send({ message: "Message updated successfully", txHash: tx.hash });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to update message" });
+    }
+});
 
-// Function to retrieve CIDs for a user
-async function getCIDs(userAddress) {
-    const cids = await contract.methods.getCIDs(userAddress).call();
-    console.log('CIDs:', cids);
-}
+// Store CID
+app.post("/storeCID", async (req, res) => {
+    const { cid, address } = req.body;
+    try {
+        const tx = await contract.storeCID(address, cid);
+        await tx.wait(); // Wait for confirmation
+        res.status(200).send({ message: "CID stored successfully", txHash: tx.hash });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to store CID" });
+    }
+});
 
-// Example usage:
-storeCID('0xYOUR_USER_ADDRESS', 'Qm...')
-    .then(() => getCIDs('0xYOUR_USER_ADDRESS'))
-    .catch(error => console.error(error));
+// Get CIDs for a user
+app.get("/getCIDs/:address", async (req, res) => {
+    const { address } = req.params;
+    try {
+        const cids = await contract.getCIDs(address);
+        res.status(200).send({ address, cids });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to retrieve CIDs" });
+    }
+});
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});

@@ -68,3 +68,11 @@ $ cast --help
 ```shell
 $ forge build && forge test && forge create --rpc-url https://eth-sepolia.g.alchemy.com/v2/IIzRcx7GwPPTndcgjPigYZcCD83wVwPU --private-key 838216c216dfc7b7a3eaea02253b134b9b40443fa549346ee3bc980d6ce9fbe8 --etherscan-api-key QKTGNT6NHAKZ1NA9WZ5JVAPB5AZH2MXUPE src/UlaloDataStore.sol:UlaloDataStore  --verify --broadcast  --constructor-args "Hello"
 ```
+
+AZURE
+
+npm install -g pm2
+
+pm2 start app.js
+pm2 save
+pm2 startup

@@ -63,6 +63,15 @@ app.post('/message', async (req, res) => {
     }
 });
 
+app.post("/api/extract-data", async (req, res) => {
+    try {
+        res.status(200).send({ data: new Date().getFullYear(), category: ["vacine", "vacine"] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to extra data" });
+    }
+});
+
 // Store a file
 app.post('/save', async (req, res) => {
     try {

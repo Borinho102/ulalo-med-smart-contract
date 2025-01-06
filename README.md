@@ -73,6 +73,6 @@ AZURE
 
 npm install -g pm2
 
-pm2 start app.js
+pm2 delete ulalo-med-contract && pm2 start app.js --name=ulalo-med-contract
 pm2 save
 pm2 startup

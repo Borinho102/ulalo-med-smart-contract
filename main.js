@@ -34,6 +34,15 @@ app.get("/", (req, res) => {
     res.send("UlaloDataStore API is running.");
 });
 
+app.post("/api/extract-data", async (req, res) => {
+    try {
+        res.status(200).send({ data: new Date().getFullYear(), category: ["vacine", "vacine"] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ error: "Failed to extra data" });
+    }
+});
+
 // Update Message
 app.post("/updateMessage", async (req, res) => {
     const { newMessage } = req.body;

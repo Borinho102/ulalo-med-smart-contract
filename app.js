@@ -112,7 +112,7 @@ app.post('/store', uploader.single('file'), async (req, res) => {
         const iv = Buffer.alloc(16, 0);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
 
-        if (!userAddress || !file || !fileType) {
+        if (!userAddress || !fileType) {
             return res.status(400).json({ error: 'userAddress and fileType are required' });
         }
         if (!file) {

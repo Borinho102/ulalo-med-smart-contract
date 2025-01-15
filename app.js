@@ -4,6 +4,12 @@ const express = require('express');
 const { ethers } = require('ethers');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const multer = require("multer");
+const axios = require('axios');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const FormData = require('form-data');
 
 // Load environment variables
 const RPC_URL = process.env.API_URL;
@@ -34,6 +40,11 @@ const ABI = [
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
+
+const storage = multer.memoryStorage();
+const uploader = multer({ storage });
+
+const secureFilePath = path.join(__dirname, '/data/secure.enc');
 
 // API endpoints
 
@@ -75,34 +86,99 @@ app.post("/api/extract-data", async (req, res) => {
 // Store a file
 app.post('/save', async (req, res) => {
     try {
-        const { cid, fileName, fileType } = req.body;
+        const { cid, file, fileName, fileType } = req.body;
         if (!cid || !fileName || !fileType) {
-            return res.status(400).json({ error: 'cid, fileName, and fileType are required' });
+            return res.status(400).json({ error: 'cid, file, fileName, and fileType are required' });
         }
 
-        const tx = await contract.storeFile(cid, fileName, fileType);
-        await tx.wait();
-        res.json({ transactionHash: tx.hash });
+        // const tx = await contract.storeFile(cid, fileName, fileType);
+        // await tx.wait();
+        // res.json({ transactionHash: tx.hash });
+        res.json({ status: "OK" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 // Store a file for a specific user
-app.post('/store', async (req, res) => {
+app.post('/store', uploader.single('file'), async (req, res) => {
     try {
-        const { userAddress, cid, fileName, fileType } = req.body;
-        if (!userAddress || !cid || !fileName || !fileType) {
-            return res.status(400).json({ error: 'userAddress, cid, fileName, and fileType are required' });
+        const { userAddress, fileType } = req.body;
+        const file = req.file;
+
+        const key = crypto.createHash('sha256').update(userAddress, 'utf8').digest().slice(0, 32);
+        const iv = Buffer.alloc(16, 0);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+
+        if (!userAddress || !file || !fileType) {
+            return res.status(400).json({ error: 'userAddress and fileType are required' });
+        }
+        if (!file) {
+            return res.status(400).json({ error: 'File are required' });
         }
 
-        const tx = await contract.storeFileForUser(userAddress, cid, fileName, fileType);
+        const fileBuffer = file.buffer;
+
+        let encrypted = cipher.update(fileBuffer);
+        encrypted = Buffer.concat([encrypted, cipher.final()]);
+
+        const timestamp = Date.now();
+        const userDirectory = path.join(__dirname, `./data/${userAddress}`);
+        const tempFilePath = path.join(userDirectory, `ulalo-encrypted-file-${timestamp}.enc`);
+
+        fs.mkdirSync(userDirectory, { recursive: true });
+        fs.writeFileSync(tempFilePath, encrypted);
+
+        const formData = new FormData();
+        formData.append('path', fs.createReadStream(tempFilePath));
+
+        const response = await axios.post(`${process.env.IPFS_HOST}/api/v0/add`, formData, {
+            headers: {
+                ...formData.getHeaders(),
+                Authorization: `Basic ${process.env.IPFS_AUTH}`,
+            },
+        });
+        fs.unlinkSync(tempFilePath);
+
+        const tx = await contract.storeFileForUser(userAddress, response.data.Hash, file.originalname, fileType);
         await tx.wait();
-        res.json({ transactionHash: tx.hash });
+        res.json({ transactionHash: tx.hash, userAddress, cid: response.data.Hash, fileName: file.originalname, fileType });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Get a file for a specific user
+app.get('/fetch/:userAddress/:cid', async (req, res) => {
+    try {
+        const { userAddress, cid } = req.params;
+
+        const key = crypto.createHash('sha256').update(userAddress, 'utf8').digest().slice(0, 32);
+        const iv = Buffer.alloc(16, 0);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+
+        if (!userAddress || !cid) {
+            return res.status(400).json({ error: 'userAddress and CID are required' });
+        }
+
+        const response = await axios.post(`${process.env.IPFS_HOST}/api/v0/cat/${cid}`, {}, {
+            responseType: 'arraybuffer',
+            headers: {
+                Authorization: `Basic ${process.env.IPFS_AUTH}`,
+            },
+        });
+
+        let decrypted = decipher.update(response.data);
+        decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+        res.setHeader('Content-Type', 'application/pdf'); // Adjust Content-Type for your file type
+        res.setHeader('Content-Disposition', `attachment; filename="decrypted-file-${Date.now()}.pdf"`);
+        res.send(decrypted);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Get files for a user
 app.get('/data/:userAddress', async (req, res) => {

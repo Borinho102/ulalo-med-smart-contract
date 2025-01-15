@@ -42,9 +42,7 @@ const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
 const storage = multer.memoryStorage();
-const uploader = multer({ storage });
-
-const secureFilePath = path.join(__dirname, '/data/secure.enc');
+const uploader = multer({ dest: 'data/' });
 
 // API endpoints
 

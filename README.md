@@ -72,6 +72,7 @@ $ forge build && forge test && forge create --rpc-url https://eth-sepolia.g.alch
 AZURE
 
 npm install -g pm2
+npm install
 
 pm2 delete ulalo-med-contract && pm2 start app.js --name=ulalo-med-contract
 pm2 save

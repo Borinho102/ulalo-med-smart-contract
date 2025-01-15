@@ -30,6 +30,9 @@ contract UlaloDataStore {
     // Event emitted whenever a new file is stored
     event FileStored(address indexed user, string cid, string fileName, string fileType);
 
+    // Event emitted when all data is cleared
+    event AllDataCleared();
+
     /**
      * @dev Stores the given CID for the sender's address.
      * @param cid The IPFS CID to store.

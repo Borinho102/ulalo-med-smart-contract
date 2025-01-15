@@ -16,7 +16,7 @@ contract UlaloDataStoreTest is Test {
         store.storeFileForUser(
             0x34f72592B9B01C724E62eDCdaa251b60A5C4F139,
             "QmX1xRGbfcPfy44AD1sR3NiE3GQmyNRR4kxmW2jKTMiqQC",
-            "vaccin2023",
+            "vaccin2024",
             "Vaccination"
         );
 
@@ -30,7 +30,7 @@ contract UlaloDataStoreTest is Test {
         UlaloDataStore.FileDetails[] memory userFiles = store.getFiles(0x34f72592B9B01C724E62eDCdaa251b60A5C4F139);
         assertEq(userFiles.length, 1);
         assertEq(userFiles[0].cid, "QmX1xRGbfcPfy44AD1sR3NiE3GQmyNRR4kxmW2jKTMiqQC");
-        assertEq(userFiles[0].fileName, "vaccin2023");
+        assertEq(userFiles[0].fileName, "vaccin2024");
         assertEq(userFiles[0].fileType, "Vaccination");
     }
 

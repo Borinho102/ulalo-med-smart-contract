@@ -144,6 +144,7 @@ app.post('/store', uploader.single('file'), async (req, res) => {
         await tx.wait();
         res.json({ transactionHash: tx.hash, userAddress, cid: response.data.Hash, fileName: file.originalname, fileType });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -175,6 +176,7 @@ app.get('/fetch/:userAddress/:cid', async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="decrypted-file-${Date.now()}.pdf"`);
         res.send(decrypted);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });

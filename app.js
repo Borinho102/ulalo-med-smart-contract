@@ -106,6 +106,8 @@ app.post('/store', uploader.single('file'), async (req, res) => {
         const { userAddress, fileType } = req.body;
         const file = req.file;
 
+        console.log(req.body);
+
         const key = crypto.createHash('sha256').update(userAddress, 'utf8').digest().slice(0, 32);
         const iv = Buffer.alloc(16, 0);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);

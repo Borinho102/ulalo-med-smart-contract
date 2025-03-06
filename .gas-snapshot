@@ -1,0 +1,4 @@
+CounterTest:testFuzz_SetNumber(uint256) (runs: 256, μ: 30966, ~: 31277)
+CounterTest:test_Increment() (gas: 31293)
+UlaloDataStoreTest:test_StoreFile() (gas: 307508)
+UlaloDataStoreTest:test_UpdateMessage() (gas: 20054)

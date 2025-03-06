@@ -1,4 +1,8 @@
 // Import required modules
+import * as IPFS from 'ipfs-core'
+
+const ipfs = await IPFS.create()
+
 require("dotenv").config();
 const express = require('express');
 const { ethers } = require('ethers');
@@ -10,6 +14,9 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
+
+// Connect to a local IPFS node
+// const ipfs = create({ url: 'http://40.67.205.233:5001' });
 
 // Load environment variables
 const RPC_URL = process.env.API_URL;
@@ -35,7 +42,6 @@ const ABI = [
     "function getFiles(address user) view returns (tuple(string cid, string fileName, string fileType)[])",
 ];
 
-// Connect to Ethereum network (use Infura, Alchemy, or a local node)
 // Set up ethers.js
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
@@ -47,30 +53,30 @@ const uploader = multer({ storage });
 // API endpoints
 
 // Get the current message
-app.get('/message', async (req, res) => {
-    try {
-        const message = await contract.message();
-        res.json({ message });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+// app.get('/message', async (req, res) => {
+//     try {
+//         const message = await contract.message();
+//         res.json({ message });
+//     } catch (err) {
+//         res.status(500).json({ error: err.message });
+//     }
+// });
 
 // Update the message
-app.post('/message', async (req, res) => {
-    try {
-        const { newMessage } = req.body;
-        if (!newMessage) {
-            return res.status(400).json({ error: 'newMessage is required' });
-        }
-
-        const tx = await contract.update(newMessage);
-        await tx.wait();
-        res.json({ transactionHash: tx.hash });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+// app.post('/message', async (req, res) => {
+//     try {
+//         const { newMessage } = req.body;
+//         if (!newMessage) {
+//             return res.status(400).json({ error: 'newMessage is required' });
+//         }
+//
+//         const tx = await contract.update(newMessage);
+//         await tx.wait();
+//         res.json({ transactionHash: tx.hash });
+//     } catch (err) {
+//         res.status(500).json({ error: err.message });
+//     }
+// });
 
 app.post("/api/extract-data", async (req, res) => {
     try {
@@ -81,30 +87,28 @@ app.post("/api/extract-data", async (req, res) => {
     }
 });
 
-// Store a file
-app.post('/save', async (req, res) => {
-    try {
-        const { cid, file, fileName, fileType } = req.body;
-        if (!cid || !fileName || !fileType) {
-            return res.status(400).json({ error: 'cid, file, fileName, and fileType are required' });
-        }
-
-        // const tx = await contract.storeFile(cid, fileName, fileType);
-        // await tx.wait();
-        // res.json({ transactionHash: tx.hash });
-        res.json({ status: "OK" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
+// // Store a file
+// app.post('/save', async (req, res) => {
+//     try {
+//         const { cid, file, fileName, fileType } = req.body;
+//         if (!cid || !fileName || !fileType) {
+//             return res.status(400).json({ error: 'cid, file, fileName, and fileType are required' });
+//         }
+//
+//         // const tx = await contract.storeFile(cid, fileName, fileType);
+//         // await tx.wait();
+//         // res.json({ transactionHash: tx.hash });
+//         res.json({ status: "OK" });
+//     } catch (err) {
+//         res.status(500).json({ error: err.message });
+//     }
+// });
 
 // Store a file for a specific user
 app.post('/store', uploader.single('file'), async (req, res) => {
     try {
         const { userAddress, fileType } = req.body;
         const file = req.file;
-
-        console.log(req.body, file);
 
         const key = crypto.createHash('sha256').update(userAddress, 'utf8').digest().slice(0, 32);
         const iv = Buffer.alloc(16, 0);
@@ -148,6 +152,7 @@ app.post('/store', uploader.single('file'), async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 // Get a file for a specific user
 app.get('/fetch/:userAddress/:cid', async (req, res) => {

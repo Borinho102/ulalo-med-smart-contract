@@ -2,7 +2,8 @@
   "name": "ulalo-contract",
   "version": "1.0.0",
   "description": "**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**",
-  "main": "app.js",
+  "main": "app.mjs",
+  "type": "module",
   "directories": {
     "lib": "lib",
     "test": "test"
@@ -21,6 +22,8 @@
     "ethers": "^6.13.4",
     "express": "^4.21.2",
     "form-data": "^4.0.1",
+    "ipfs-core": "^0.18.1",
+    "ipfs-http-client": "^60.0.1",
     "multer": "^1.4.5-lts.1"
   }
 }

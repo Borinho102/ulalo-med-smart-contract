@@ -1,88 +1,43 @@
-// app.js
-require("dotenv").config();
-const express = require("express");
-const { ethers } = require("ethers");
+import {unixfs} from "@helia/unixfs";
+import {createHelia} from "helia";
+import {CID} from "multiformats";
+import { fromString } from 'uint8arrays/from-string';
 
-const app = express();
-app.use(express.json());
+async function retrieveFile(cidString) {
+    // Create a Helia node
+    const helia = await createHelia();
+    const fs = unixfs(helia);
 
-// Load environment variables
-const RPC_URL = process.env.API_URL;
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+    // Convert CID string to CID object
+    const cid = CID.parse(cidString);
 
-// Contract ABI (from compilation output or etherscan)
-const CONTRACT_ABI = [
-    "event UpdatedMessages(string oldStr, string newStr)",
-    "event CIDStored(address user, string cid)",
-    "event CIStore(address indexed user, string cid)",
-    "function update(string memory newMessage) public",
-    "function store(string memory cid) public",
-    "function storeCID(address user, string memory cid) public",
-    "function getCIDs(address user) public view returns (string[] memory)",
-];
-
-// Set up ethers.js
-const provider = new ethers.JsonRpcProvider(RPC_URL);
-const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
-
-// API Routes
-
-// Health Check
-app.get("/", (req, res) => {
-    res.send("UlaloDataStore API is running.");
-});
-
-app.post("/api/extract-data", async (req, res) => {
-    try {
-        res.status(200).send({ data: new Date().getFullYear(), category: ["vacine", "vacine"] });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to extra data" });
+    // Retrieve the stored content
+    let content = new Uint8Array();
+    for await (const chunk of fs.cat(cid)) {
+        content = new Uint8Array([...content, ...chunk]);
     }
-});
 
-// Update Message
-app.post("/updateMessage", async (req, res) => {
-    const { newMessage } = req.body;
-    try {
-        const tx = await contract.update(newMessage);
-        await tx.wait(); // Wait for confirmation
-        res.status(200).send({ message: "Message updated successfully", txHash: tx.hash });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to update message" });
-    }
-});
+    console.log("Retrieved Content:", new TextDecoder().decode(content));
 
-// Store CID
-app.post("/storeCID", async (req, res) => {
-    const { cid, address } = req.body;
-    try {
-        const tx = await contract.storeCID(address, cid);
-        await tx.wait(); // Wait for confirmation
-        res.status(200).send({ message: "CID stored successfully", txHash: tx.hash });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to store CID" });
-    }
-});
+}
 
-// Get CIDs for a user
-app.get("/getCIDs/:address", async (req, res) => {
-    const { address } = req.params;
-    try {
-        const cids = await contract.getCIDs(address);
-        res.status(200).send({ address, cids });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ error: "Failed to retrieve CIDs" });
-    }
-});
+async function storeFile() {
+    // Create a Helia node
+    const helia = await createHelia();
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+    // Create a UnixFS instance for file storage
+    const fs = unixfs(helia);
+
+    // File content to store
+    const content = fromString("Hello World, IPFS Helia!");
+
+    // Add the file to IPFS
+    const cid = await fs.addBytes(content);
+
+    console.log("File stored with CID:", cid.toString());
+
+    await retrieveFile(cid.toString());
+
+}
+
+storeFile();

@@ -14,11 +14,20 @@ import FormData from 'form-data';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
+
+import { createHelia } from 'helia';
+import { unixfs } from '@helia/unixfs';
+import { fromString } from 'uint8arrays/from-string';
+import { sha512 } from 'multiformats/hashes/sha2'
+import {CID} from "multiformats";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Connect to a local IPFS node
 const ipfs = await IPFS.create();
+// const helia = await createHelia()
+// const ipfs = unixfs(helia)
 
 // Load environment variables
 const RPC_URL = process.env.API_URL;
@@ -85,8 +94,8 @@ app.post('/store', uploader.single('file'), async (req, res) => {
 
         fs.mkdirSync(userDirectory, { recursive: true });
         fs.writeFileSync(tempFilePath, encrypted);
-
         const fileContent = fs.readFileSync(tempFilePath);
+
         const { cid } = await ipfs.add(fileContent);
         fs.unlinkSync(tempFilePath);
 
@@ -108,6 +117,39 @@ app.get('/data/:userAddress', async (req, res) => {
         const files = await contract.getFiles(userAddress);
         res.json({ files });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/fetch/:userAddress/:cid', async (req, res) => {
+    try {
+        const { userAddress, cid } = req.params;
+
+        if (!userAddress || !cid) {
+            return res.status(400).json({ error: 'userAddress and CID are required' });
+        }
+
+        // Fetch file from IPFS
+        const stream = ipfs.cat(cid);
+        let encryptedData = Buffer.alloc(0);
+
+        for await (const chunk of stream) {
+            encryptedData = Buffer.concat([encryptedData, chunk]);
+        }
+
+        // Decrypt file
+        const key = crypto.createHash('sha256').update(userAddress, 'utf8').digest().slice(0, 32);
+        const iv = Buffer.alloc(16, 0);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+
+        let decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+
+        // Set appropriate headers and send the decrypted file
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="decrypted-file-${Date.now()}"`);
+        res.send(decrypted);
+    } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });

@@ -36,7 +36,7 @@ const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
 // Initialize Express app
 const app = express();
-const port = 3000;
+const port = 4000;
 
 // Middleware
 app.use(cors());

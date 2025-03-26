@@ -12,30 +12,27 @@ contract UlaloDataStoreTest is Test {
     }
 
     function test_StoreFile() public {
-        store.storeFile("QmTD9QACHvxBVjNszqWJPgcuGGwfSD681Vk4dCkEhJVH9k", "TestFile1", "PDF");
         store.storeFileForUser(
             0x34f72592B9B01C724E62eDCdaa251b60A5C4F139,
             "QmX1xRGbfcPfy44AD1sR3NiE3GQmyNRR4kxmW2jKTMiqQC",
-            "vaccin2024",
-            "Vaccination"
+            "vaccin-2024.pdf",
+            "Vaccination", 1024, "This is a Test", "12-03-2025", 50.5
         );
 
         // Validate that files are stored correctly
-        UlaloDataStore.FileDetails[] memory files = store.getFiles(address(this));
-        assertEq(files.length, 1);
-        assertEq(files[0].cid, "QmTD9QACHvxBVjNszqWJPgcuGGwfSD681Vk4dCkEhJVH9k");
-        assertEq(files[0].fileName, "TestFile1");
-        assertEq(files[0].fileType, "PDF");
-
         UlaloDataStore.FileDetails[] memory userFiles = store.getFiles(0x34f72592B9B01C724E62eDCdaa251b60A5C4F139);
         assertEq(userFiles.length, 1);
         assertEq(userFiles[0].cid, "QmX1xRGbfcPfy44AD1sR3NiE3GQmyNRR4kxmW2jKTMiqQC");
-        assertEq(userFiles[0].fileName, "vaccin2024");
+        assertEq(userFiles[0].fileName, "vaccin-2024.pdf");
         assertEq(userFiles[0].fileType, "Vaccination");
+        assertEq(userFiles[0].fileSize, 1024);
+        assertEq(userFiles[0].date, "12-03-2025");
+        assertEq(userFiles[0].score, 50.5);
+        assertEq(userFiles[0].fileContent, "This is a Test");
     }
 
     function test_UpdateMessage() public {
-        store.update("Hi Borix102!");
-        assertEq(store.message(), "Hi Borix102!");
+        store.update("Hi Ulalo!");
+        assertEq(store.message(), "Hi Ulalo!");
     }
 }

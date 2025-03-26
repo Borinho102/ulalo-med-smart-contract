@@ -76,7 +76,7 @@ contract UlaloDataStore {
      * @param userAddress The address of the user whose files are to be retrieved.
      * @return An array of FileDetails stored by the user.
      */
-    function clearUserFiles(address userAddress) public view returns (FileDetails[] memory) {
+    function clearUserFiles(address userAddress) public returns (FileDetails[] memory) {
         // Check if the user has any files to clear
         require(userFiles[userAddress].length > 0, "No files to clear for this user");
 
@@ -98,7 +98,7 @@ contract UlaloDataStore {
      * @param cid The IPFS CID to store.
      * @return An array of FileDetails stored by the user.
      */
-    function deleteUserFile(address userAddress, string memory cid) public view returns (FileDetails[] memory) {
+    function deleteUserFile(address userAddress, string memory cid) public returns (FileDetails[] memory) {
         // Optional: Add access control
         require(msg.sender == userAddress, "Not authorized to delete files");
 

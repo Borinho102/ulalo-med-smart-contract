@@ -45,12 +45,16 @@ app.use(bodyParser.json());
 // Contract details
 const ABI = [
     "event UpdatedMessages(string oldStr, string newStr)",
-    "event FileStored(address indexed user, string cid, string fileName, string fileType)",
+    "event AllFilesCleared(address indexed userAddress)",
+    "event FileDeleted(address indexed userAddress, string cid)",
+    "event AllDataCleared()",
+    "event FileStored(address indexed user, string cid, string fileName, string fileType, uint256 fileSize, string fileContent, string date, uint256 score)",
     "function message() view returns (string)",
     "function update(string newMessage)",
-    "function storeFile(string cid, string fileName, string fileType)",
-    "function storeFileForUser(address userAddress, string cid, string fileName, string fileType)",
-    "function getFiles(address user) view returns (tuple(string cid, string fileName, string fileType)[])",
+    "function storeFileForUser(address userAddress, string memory cid, string memory fileName, string memory fileType, uint256 fileSize, string memory fileContent, string memory date, uint256 score)",
+    "function getFiles(address user) public view returns (string[], string[], string[], uint256[], string[], string[], uint256[])",
+    "function deleteUserFile(address user, string cid) public view returns (string[], string[], string[], uint256[], string[], string[], uint256[])",
+    "function clearAllFiles(address userAddress) public view returns (string[], string[], string[], uint256[], string[], string[], uint256[])"
 ];
 
 // Set up ethers.js
@@ -74,12 +78,16 @@ app.post("/api/extract-data", async (req, res) => {
 // Store a file for a specific user
 app.post('/store', uploader.single('file'), async (req, res) => {
     try {
-        const { userAddress, fileType } = req.body;
+        const { userAddress, fileType, content, score } = req.body;
         const file = req.file;
 
         if (!userAddress || !fileType || !file) {
             return res.status(400).json({ error: 'userAddress, fileType, and file are required' });
         }
+
+        const size = (file.size/(1024*1024)).toFixed(2)
+
+        const today = new Date().toLocaleDateString("en-GB").replace(/\//g, "-")
 
         const key = crypto.createHash('sha256').update(userAddress, 'utf8').digest().slice(0, 32);
         const iv = Buffer.alloc(16, 0);
@@ -101,9 +109,9 @@ app.post('/store', uploader.single('file'), async (req, res) => {
 
         const cidString = cid.toString();
 
-        const tx = await contract.storeFileForUser(userAddress, cidString, file.originalname, fileType);
+        const tx = await contract.storeFileForUser(userAddress, cidString, file.originalname, fileType, Math.round(size * 100), content, today, Math.round(score * 100));
         await tx.wait();
-        res.json({ transactionHash: tx.hash, userAddress, cid: cidString, fileName: file.originalname, fileType });
+        res.json({ transactionHash: tx.hash, userAddress, cid: cidString, fileName: file.originalname, fileType, fileContent: content, score: score, date: today, fileSize: size });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
@@ -114,12 +122,32 @@ app.post('/store', uploader.single('file'), async (req, res) => {
 app.get('/data/:userAddress', async (req, res) => {
     try {
         const { userAddress } = req.params;
-        const files = await contract.getFiles(userAddress);
+
+        const result = await contract.getFiles(userAddress);
+
+        if (!result || result[0].length === 0) {
+            return res.status(404).json({ error: "No files stored for this user" });
+        }
+
+        const [cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores] = result;
+
+        let files = cids.map((_, index) => ({
+            cid: cids[index],
+            fileName: fileNames[index],
+            fileType: fileTypes[index],
+            fileSize: Number(fileSizes[index]) / 100,
+            fileContent: fileContents[index],
+            date: dates[index],
+            score: Number(scores[index]) / 100,
+        }));
+
         res.json({ files });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
+
 
 app.get('/fetch/:userAddress/:cid', async (req, res) => {
     try {
@@ -153,6 +181,55 @@ app.get('/fetch/:userAddress/:cid', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+
+app.delete('/delete/:userAddress/:cid', async (req, res) => {
+    try {
+        const { userAddress, cid } = req.params;
+
+        const result = await contract.deleteUserFile(userAddress, cid);
+
+        if (!result) {
+            return res.status(400).json({ error: "Failed to delete user data" });
+        }
+
+        const [cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores] = result;
+
+        let files = cids.map((_, index) => ({
+            cid: cids[index],
+            fileName: fileNames[index],
+            fileType: fileTypes[index],
+            fileSize: Number(fileSizes[index]),
+            fileContent: fileContents[index],
+            date: dates[index],
+            score: Number(scores[index]),
+        }));
+
+        res.json({ files });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+app.delete('/clear/:userAddress/', async (req, res) => {
+    try {
+        const { userAddress, cid } = req.params;
+
+        const result = await contract.clearAllFiles(userAddress, cid);
+
+        if (!result) {
+            return res.status(400).json({ error: "Failed to delete user data" });
+        }
+
+        res.json({ result });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Start the server
 app.listen(port, () => {

@@ -37,13 +37,7 @@ contract UlaloDataStore {
     // Event emitted when all data is cleared
     event AllDataCleared();
 
-    /**
-     * @dev Stores the given CID for a specific user address.
-     * @param userAddress The address of the user.
-     * @param cid The IPFS CID to store.
-     * @param fileName The name of the file.
-     * @param fileType The type of the file (e.g., PDF, JPEG).
-     */
+
     function storeFileForUser(address userAddress, string memory cid, string memory fileName, string memory fileType, uint256 fileSize, string memory fileContent, string memory date, uint256 score) public {
         require(bytes(cid).length > 0, "CID cannot be empty");
         require(bytes(fileName).length > 0, "File name cannot be empty");
@@ -62,70 +56,129 @@ contract UlaloDataStore {
         emit FileStored(userAddress, cid, fileName, fileType, fileSize, fileContent, date, score);
     }
 
-    /**
-     * @dev Retrieves all file details associated with the given address.
-     * @param user The address of the user whose files are to be retrieved.
-     * @return An array of FileDetails stored by the user.
-     */
-    function getFiles(address user) public view returns (FileDetails[] memory) {
-        return userFiles[user];
+
+    function getFiles(address user) public view returns (
+        string[] memory cids,
+        string[] memory fileNames,
+        string[] memory fileTypes,
+        uint256[] memory fileSizes,
+        string[] memory fileContents,
+        string[] memory dates,
+        uint256[] memory scores
+    ) {
+        uint256 length = userFiles[user].length;
+        require(length > 0, "No files stored for this user"); // Ensure data exists
+
+        string[] memory cidsArray = new string[](length);
+        string[] memory fileNamesArray = new string[](length);
+        string[] memory fileTypesArray = new string[](length);
+        uint256[] memory fileSizesArray = new uint256[](length);
+        string[] memory fileContentsArray = new string[](length);
+        string[] memory datesArray = new string[](length);
+        uint256[] memory scoresArray = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            FileDetails storage file = userFiles[user][i];
+            cidsArray[i] = file.cid;
+            fileNamesArray[i] = file.fileName;
+            fileTypesArray[i] = file.fileType;
+            fileSizesArray[i] = file.fileSize;
+            fileContentsArray[i] = file.fileContent;
+            datesArray[i] = file.date;
+            scoresArray[i] = file.score;
+        }
+
+        return (cidsArray, fileNamesArray, fileTypesArray, fileSizesArray, fileContentsArray, datesArray, scoresArray);
     }
 
-    /**
-     * @dev Clear all user data from the database.
-     * @param userAddress The address of the user whose files are to be retrieved.
-     * @return An array of FileDetails stored by the user.
-     */
-    function clearUserFiles(address userAddress) public returns (FileDetails[] memory) {
-        // Check if the user has any files to clear
-        require(userFiles[userAddress].length > 0, "No files to clear for this user");
-
-        // Delete the entire array of files for the user
-        delete userFiles[userAddress];
-
-        // Emit an event to log the file clearing action
-        emit UserFilesCleared(userAddress);
-
-        return userFiles[userAddress];
-    }
-
-    event UserFilesCleared(address indexed userAddress);
 
 
-    /**
-     * @dev Clear all user data from the database.
-     * @param userAddress The address of the user whose files are to be retrieved.
-     * @param cid The IPFS CID to store.
-     * @return An array of FileDetails stored by the user.
-     */
-    function deleteUserFile(address userAddress, string memory cid) public returns (FileDetails[] memory) {
-        // Optional: Add access control
-        require(msg.sender == userAddress, "Not authorized to delete files");
-
-        // Check if the user has any files
+    function clearAllFiles(address userAddress) public returns (
+        string[] memory,
+        string[] memory,
+        string[] memory,
+        uint256[] memory,
+        string[] memory,
+        string[] memory,
+        uint256[] memory
+    ) {
+        require(msg.sender == userAddress, "Not authorized to clear files");
         require(userFiles[userAddress].length > 0, "No files exist for this user");
 
-        // Track whether a file was deleted
+        // Delete all files
+        delete userFiles[userAddress];
+
+        emit AllFilesCleared(userAddress);
+
+        // Return empty arrays
+        string[] memory emptyStringArray;
+        uint256[] memory emptyUintArray;
+
+        return (emptyStringArray, emptyStringArray, emptyStringArray, emptyUintArray, emptyStringArray, emptyStringArray, emptyUintArray);
+    }
+
+    // Event for logging
+    event AllFilesCleared(address indexed userAddress);
+
+
+
+
+    function deleteUserFile(address userAddress, string memory cid) public returns (
+        string[] memory cids,
+        string[] memory fileNames,
+        string[] memory fileTypes,
+        uint256[] memory fileSizes,
+        string[] memory fileContents,
+        string[] memory dates,
+        uint256[] memory scores
+    ) {
+        require(msg.sender == userAddress, "Not authorized to delete files");
+        require(userFiles[userAddress].length > 0, "No files exist for this user");
+
+        uint256 indexToDelete = userFiles[userAddress].length; // Set to out-of-bounds value
         bool fileDeleted = false;
 
-        // Find and remove the specific file by CID
         for (uint256 i = 0; i < userFiles[userAddress].length; i++) {
             if (keccak256(abi.encodePacked(userFiles[userAddress][i].cid)) == keccak256(abi.encodePacked(cid))) {
-                // Remove the file by replacing it with the last element and then reducing the array length
-                userFiles[userAddress][i] = userFiles[userAddress][userFiles[userAddress].length - 1];
-                userFiles[userAddress].pop();
+                indexToDelete = i;
                 fileDeleted = true;
                 break;
             }
         }
 
-        // Ensure the file was actually deleted
         require(fileDeleted, "File with specified CID not found");
 
-        // Emit an event to log the file deletion
+        // Only swap if not the last item
+        if (indexToDelete < userFiles[userAddress].length - 1) {
+            userFiles[userAddress][indexToDelete] = userFiles[userAddress][userFiles[userAddress].length - 1];
+        }
+
+        userFiles[userAddress].pop(); // Remove last element
+
         emit FileDeleted(userAddress, cid);
 
-        return userFiles[userAddress];
+        // Prepare fresh data return
+        uint256 length = userFiles[userAddress].length;
+        cids = new string[](length);
+        fileNames = new string[](length);
+        fileTypes = new string[](length);
+        fileSizes = new uint256[](length);
+        fileContents = new string[](length);
+        dates = new string[](length);
+        scores = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            FileDetails storage file = userFiles[userAddress][i];
+            cids[i] = file.cid;
+            fileNames[i] = file.fileName;
+            fileTypes[i] = file.fileType;
+            fileSizes[i] = file.fileSize;
+            fileContents[i] = file.fileContent;
+            dates[i] = file.date;
+            scores[i] = file.score;
+        }
+
+        return (cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores);
     }
 
     event FileDeleted(address indexed userAddress, string cid);

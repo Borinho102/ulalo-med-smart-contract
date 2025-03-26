@@ -20,7 +20,29 @@ contract UlaloDataStoreTest is Test {
         );
 
         // Validate that files are stored correctly
-        UlaloDataStore.FileDetails[] memory userFiles = store.getFiles(0x34f72592B9B01C724E62eDCdaa251b60A5C4F139);
+        (string[] memory cids,
+            string[] memory fileNames,
+            string[] memory fileTypes,
+            uint256[] memory fileSizes,
+            string[] memory fileContents,
+            string[] memory dates,
+            uint256[] memory scores) = store.getFiles(0x34f72592B9B01C724E62eDCdaa251b60A5C4F139);
+
+
+        UlaloDataStore.FileDetails[] memory userFiles = new UlaloDataStore.FileDetails[](cids.length);
+
+        for (uint256 i = 0; i < cids.length; i++) {
+            userFiles[i] = UlaloDataStore.FileDetails({
+                cid: cids[i],
+                fileName: fileNames[i],
+                fileType: fileTypes[i],
+                fileSize: fileSizes[i],
+                fileContent: fileContents[i],
+                date: dates[i],
+                score: scores[i]
+            });
+        }
+
         assertEq(userFiles.length, 1);
         assertEq(userFiles[0].cid, "QmX1xRGbfcPfy44AD1sR3NiE3GQmyNRR4kxmW2jKTMiqQC");
         assertEq(userFiles[0].fileName, "vaccin-2024.pdf");

@@ -101,7 +101,7 @@ app.post('/store', uploader.single('file'), async (req, res) => {
 
         const tx = await contract.storeFileForUser(userAddress, cidString, file.originalname, fileType, Math.round(size * 100), content, today, Math.round(score * 100));
         await tx.wait();
-        res.json({ transactionHash: tx.hash, userAddress, cid: cidString, fileName: file.originalname, fileType, fileContent: content, score: score, date: today, fileSize: size });
+        res.json({ transactionHash: tx.hash, userAddress, cid: cidString, fileName: file.originalname, fileType, fileContent: content, score: Number(score), date: today, fileSize: Number(size) });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

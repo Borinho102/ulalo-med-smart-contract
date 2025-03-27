@@ -175,11 +175,6 @@ app.get('/fetch/:userAddress/:cid', async (req, res) => {
 
         let decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
 
-        // Ensure the decrypted file is a PDF
-        // if (!fileTypes[index].includes("pdf")) {
-        //     return res.status(400).json({ error: "The requested file is not a PDF" });
-        // }
-
         // Set response headers for PDF
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${fileNames[index] ?? `Document-${Date.now()}.pdf`}"`);

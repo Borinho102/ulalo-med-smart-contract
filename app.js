@@ -6,28 +6,18 @@ import { ethers } from 'ethers';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import multer from 'multer';
-import axios from 'axios';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import FormData from 'form-data';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-
-import { createHelia } from 'helia';
-import { unixfs } from '@helia/unixfs';
-import { fromString } from 'uint8arrays/from-string';
-import { sha512 } from 'multiformats/hashes/sha2'
-import {CID} from "multiformats";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Connect to a local IPFS node
 const ipfs = await IPFS.create();
-// const helia = await createHelia()
-// const ipfs = unixfs(helia)
 
 // Load environment variables
 const RPC_URL = process.env.API_URL;
@@ -157,6 +147,19 @@ app.get('/fetch/:userAddress/:cid', async (req, res) => {
             return res.status(400).json({ error: 'userAddress and CID are required' });
         }
 
+        const result = await contract.getFiles(userAddress);
+
+        if (!result || result[0].length === 0) {
+            return res.status(404).json({ error: "No files stored for this user" });
+        }
+
+        const [cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores] = result;
+        const index = cids.lastIndexOf(cid);
+
+        if (index === -1) {
+            return res.status(404).json({ error: "File not found for this CID" });
+        }
+
         // Fetch file from IPFS
         const stream = ipfs.cat(cid);
         let encryptedData = Buffer.alloc(0);
@@ -172,15 +175,23 @@ app.get('/fetch/:userAddress/:cid', async (req, res) => {
 
         let decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
 
-        // Set appropriate headers and send the decrypted file
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="decrypted-file-${Date.now()}"`);
+        // Ensure the decrypted file is a PDF
+        // if (!fileTypes[index].includes("pdf")) {
+        //     return res.status(400).json({ error: "The requested file is not a PDF" });
+        // }
+
+        // Set response headers for PDF
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileNames[index] ?? `Document-${Date.now()}.pdf`}"`);
+
+        // Send decrypted PDF file
         res.send(decrypted);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
     }
 });
+
 
 
 app.delete('/delete/:userAddress/:cid', async (req, res) => {

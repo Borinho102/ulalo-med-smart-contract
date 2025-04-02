@@ -39,7 +39,8 @@ contract UlaloDataStoreTest is Test {
                 fileSize: fileSizes[i],
                 fileContent: fileContents[i],
                 date: dates[i],
-                score: scores[i]
+                score: scores[i],
+                active: true
             });
         }
 
@@ -50,6 +51,7 @@ contract UlaloDataStoreTest is Test {
         assertEq(userFiles[0].fileSize, 1024);
         assertEq(userFiles[0].date, "12-03-2025");
         assertEq(userFiles[0].score, 10**18);
+        assertEq(userFiles[0].active, true);
         assertEq(userFiles[0].fileContent, "This is a Test");
     }
 

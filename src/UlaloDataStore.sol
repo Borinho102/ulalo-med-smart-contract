@@ -26,6 +26,7 @@ contract UlaloDataStore {
         string fileContent;
         string date;
         uint256 score;
+        bool active;
     }
 
     // Mapping to store multiple file details for each address
@@ -50,7 +51,8 @@ contract UlaloDataStore {
             fileSize: fileSize,
             fileContent: fileContent,
             date: date,
-            score: score
+            score: score,
+            active: true
         }));
 
         emit FileStored(userAddress, cid, fileName, fileType, fileSize, fileContent, date, score);
@@ -67,28 +69,39 @@ contract UlaloDataStore {
         uint256[] memory scores
     ) {
         uint256 length = userFiles[user].length;
-        require(length > 0, "No files stored for this user"); // Ensure data exists
+        uint256 validFileCount = 0;
 
-        string[] memory cidsArray = new string[](length);
-        string[] memory fileNamesArray = new string[](length);
-        string[] memory fileTypesArray = new string[](length);
-        uint256[] memory fileSizesArray = new uint256[](length);
-        string[] memory fileContentsArray = new string[](length);
-        string[] memory datesArray = new string[](length);
-        uint256[] memory scoresArray = new uint256[](length);
-
+        // First, count valid (active) files
         for (uint256 i = 0; i < length; i++) {
-            FileDetails storage file = userFiles[user][i];
-            cidsArray[i] = file.cid;
-            fileNamesArray[i] = file.fileName;
-            fileTypesArray[i] = file.fileType;
-            fileSizesArray[i] = file.fileSize;
-            fileContentsArray[i] = file.fileContent;
-            datesArray[i] = file.date;
-            scoresArray[i] = file.score;
+            if (userFiles[user][i].active) {
+                validFileCount++;
+            }
         }
 
-        return (cidsArray, fileNamesArray, fileTypesArray, fileSizesArray, fileContentsArray, datesArray, scoresArray);
+        // Initialize arrays with only the non-deleted (active) files
+        cids = new string[](validFileCount);
+        fileNames = new string[](validFileCount);
+        fileTypes = new string[](validFileCount);
+        fileSizes = new uint256[](validFileCount);
+        fileContents = new string[](validFileCount);
+        dates = new string[](validFileCount);
+        scores = new uint256[](validFileCount);
+
+        uint256 index = 0;
+        for (uint256 i = 0; i < length; i++) {
+            if (userFiles[user][i].active) {
+                FileDetails storage file = userFiles[user][i];
+                cids[index] = file.cid;
+                fileNames[index] = file.fileName;
+                fileTypes[index] = file.fileType;
+                fileSizes[index] = file.fileSize;
+                fileContents[index] = file.fileContent;
+                dates[index] = file.date;
+                scores[index] = file.score;
+                index++;
+            }
+        }
+        return (cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores);
     }
 
 
@@ -105,16 +118,16 @@ contract UlaloDataStore {
         require(msg.sender == userAddress, "Not authorized to clear files");
         require(userFiles[userAddress].length > 0, "No files exist for this user");
 
-        // Delete all files
-        delete userFiles[userAddress];
+        // Set the active flag to false for all files
+        uint256 fileCount = userFiles[userAddress].length;
+        for (uint256 i = 0; i < fileCount; i++) {
+            userFiles[userAddress][i].active = false;
+        }
 
         emit AllFilesCleared(userAddress);
 
-        // Return empty arrays
-        string[] memory emptyStringArray;
-        uint256[] memory emptyUintArray;
-
-        return (emptyStringArray, emptyStringArray, emptyStringArray, emptyUintArray, emptyStringArray, emptyStringArray, emptyUintArray);
+        // Return the updated file details with inactive files
+        return getUpdatedFiles(userAddress);
     }
 
     // Event for logging
@@ -123,7 +136,9 @@ contract UlaloDataStore {
 
 
 
-    function deleteUserFile(address userAddress, string memory cid) public returns (
+    event FileDeleted(address indexed userAddress, string cid, uint256 index);
+
+    function deleteUserFile(address userAddress, uint256 index, string memory cid) public returns (
         string[] memory cids,
         string[] memory fileNames,
         string[] memory fileTypes,
@@ -132,33 +147,38 @@ contract UlaloDataStore {
         string[] memory dates,
         uint256[] memory scores
     ) {
+
         require(msg.sender == userAddress, "Not authorized to delete files");
-        require(userFiles[userAddress].length > 0, "No files exist for this user");
+        uint256 fileCount = userFiles[userAddress].length;
+        require(fileCount > 0, "No files exist for this user");
+        require(index < fileCount, "Invalid index");
 
-        uint256 indexToDelete = userFiles[userAddress].length; // Set to out-of-bounds value
-        bool fileDeleted = false;
+        // Verify the file at the given index matches the CID
+        require(
+            keccak256(abi.encodePacked(userFiles[userAddress][index].cid)) == keccak256(abi.encodePacked(cid)),
+            "File CID does not match"
+        );
 
-        for (uint256 i = 0; i < userFiles[userAddress].length; i++) {
-            if (keccak256(abi.encodePacked(userFiles[userAddress][i].cid)) == keccak256(abi.encodePacked(cid))) {
-                indexToDelete = i;
-                fileDeleted = true;
-                break;
-            }
-        }
+        // Mark the file as inactive (deleted)
+        userFiles[userAddress][index].active = false;
 
-        require(fileDeleted, "File with specified CID not found");
+        emit FileDeleted(userAddress, cid, index);
 
-        // Only swap if not the last item
-        if (indexToDelete < userFiles[userAddress].length - 1) {
-            userFiles[userAddress][indexToDelete] = userFiles[userAddress][userFiles[userAddress].length - 1];
-        }
+        // ✅ Return updated file list
+        return getUpdatedFiles(userAddress);
+    }
 
-        userFiles[userAddress].pop(); // Remove last element
-
-        emit FileDeleted(userAddress, cid);
-
-        // Prepare fresh data return
+    function getUpdatedFiles(address userAddress) internal view returns (
+        string[] memory cids,
+        string[] memory fileNames,
+        string[] memory fileTypes,
+        uint256[] memory fileSizes,
+        string[] memory fileContents,
+        string[] memory dates,
+        uint256[] memory scores
+    ) {
         uint256 length = userFiles[userAddress].length;
+
         cids = new string[](length);
         fileNames = new string[](length);
         fileTypes = new string[](length);
@@ -180,6 +200,4 @@ contract UlaloDataStore {
 
         return (cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores);
     }
-
-    event FileDeleted(address indexed userAddress, string cid);
 }

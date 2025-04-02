@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Connect to a local IPFS node
-const ipfs = await IPFS.create();
+const ipfs = await IPFS.create({ url: "http://40.67.205.233:5001" });
 
 // Load environment variables
 const RPC_URL = process.env.API_URL;
@@ -43,7 +43,7 @@ const ABI = [
     "function update(string newMessage)",
     "function storeFileForUser(address userAddress, string memory cid, string memory fileName, string memory fileType, uint256 fileSize, string memory fileContent, string memory date, uint256 score)",
     "function getFiles(address user) public view returns (string[], string[], string[], uint256[], string[], string[], uint256[])",
-    "function deleteUserFile(address user, string cid) public view returns (string[], string[], string[], uint256[], string[], string[], uint256[])",
+    "function deleteUserFile(address userAddress, uint256 index) public view returns (string[], string[], string[], uint256[], string[], string[], uint256[])",
     "function clearAllFiles(address userAddress) public view returns (string[], string[], string[], uint256[], string[], string[], uint256[])"
 ];
 
@@ -98,6 +98,7 @@ app.post('/store', uploader.single('file'), async (req, res) => {
         fs.unlinkSync(tempFilePath);
 
         const cidString = cid.toString();
+        await ipfs.pin.add(cidString)
 
         const tx = await contract.storeFileForUser(userAddress, cidString, file.originalname, fileType, Math.round(size * 100), content, today, Math.round(score * 100));
         await tx.wait();
@@ -107,6 +108,9 @@ app.post('/store', uploader.single('file'), async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+
+
 
 // Get files for a user
 app.get('/data/:userAddress', async (req, res) => {
@@ -122,6 +126,7 @@ app.get('/data/:userAddress', async (req, res) => {
         const [cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores] = result;
 
         let files = cids.map((_, index) => ({
+            id: index,
             cid: cids[index],
             fileName: fileNames[index],
             fileType: fileTypes[index],
@@ -160,7 +165,6 @@ app.get('/fetch/:userAddress/:cid', async (req, res) => {
             return res.status(404).json({ error: "File not found for this CID" });
         }
 
-        // Fetch file from IPFS
         const stream = ipfs.cat(cid);
         let encryptedData = Buffer.alloc(0);
 
@@ -188,12 +192,66 @@ app.get('/fetch/:userAddress/:cid', async (req, res) => {
 });
 
 
-
-app.delete('/delete/:userAddress/:cid', async (req, res) => {
+app.get('/get/:userAddress/:id/:cid/', async (req, res) => {
     try {
-        const { userAddress, cid } = req.params;
+        const { userAddress, id, cid } = req.params;
 
-        const result = await contract.deleteUserFile(userAddress, cid);
+        const result = await contract.getFiles(userAddress);
+
+        if (!result || result[0].length === 0) {
+            return res.status(404).json({ error: "No files stored for this user" });
+        }
+
+        const [cids, fileNames, fileTypes, fileSizes, fileContents, dates, scores] = result;
+
+        let files = cids.map((_, index) => ({
+            id: index,
+            cid: cids[index],
+            fileName: fileNames[index],
+            fileType: fileTypes[index],
+            fileSize: Number(fileSizes[index]) / 100,
+            fileContent: fileContents[index],
+            date: dates[index],
+            score: Number(scores[index]) / 100,
+        }));
+
+        let filteredFiles = files.filter(file => file.id === Number(id) && file.cid === cid);
+        if(!filteredFiles.length) {
+            return res.status(404).json({ error: "No files stored for this user" });
+        }
+        const data = filteredFiles[0]
+        const stream = ipfs.cat(data.cid);
+        let encryptedData = Buffer.alloc(0);
+
+        for await (const chunk of stream) {
+            encryptedData = Buffer.concat([encryptedData, chunk]);
+        }
+
+        // Decrypt file
+        const key = crypto.createHash('sha256').update(userAddress, 'utf8').digest().slice(0, 32);
+        const iv = Buffer.alloc(16, 0);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+
+        let decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+
+        // Set response headers for PDF
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${data.fileName ?? `Document-${Date.now()}.pdf`}"`);
+
+        // Send decrypted PDF file
+        res.send(decrypted);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+app.delete('/delete/:userAddress/:id/:cid', async (req, res) => {
+    try {
+        const { userAddress, id, cid } = req.params;
+
+        const result = await contract.deleteUserFile(userAddress, id);
 
         if (!result) {
             return res.status(400).json({ error: "Failed to delete user data" });
@@ -211,7 +269,7 @@ app.delete('/delete/:userAddress/:cid', async (req, res) => {
             score: Number(scores[index]),
         }));
 
-        res.json({ files });
+        res.json({ length: files.length, files });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

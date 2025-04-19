@@ -52,6 +52,8 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
+console.log("Contrat Address:", CONTRACT_ADDRESS)
+
 const storage = multer.memoryStorage();
 const uploader = multer({ storage });
 
@@ -108,8 +110,6 @@ app.post('/store', uploader.single('file'), async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
-
 
 
 // Get files for a user
@@ -288,6 +288,30 @@ app.delete('/clear/:userAddress/', async (req, res) => {
         }
 
         res.json({ result });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+app.get('/info', async (req, res) => {
+    try {
+        const version = await ipfs.version();
+        const id = await ipfs.id();
+        const isOnline = ipfs.isOnline();
+        res.json({
+            "testnet": "https://testnet.ulalo.xyz/address/" + process.env.CONTRACT_ADDRESS,
+            "contract": process.env.CONTRACT_ADDRESS,
+            "ipfs": {
+                "version": version,
+                "nodeId": id.id,
+                "address": id.addresses,
+                "agent": id.agentVersion,
+                "protocols": id.protocols,
+                "online": isOnline
+            }
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });

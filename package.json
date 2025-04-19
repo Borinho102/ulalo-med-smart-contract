@@ -20,6 +20,7 @@
     "@helia/json": "^4.0.2",
     "@helia/strings": "^4.0.2",
     "@helia/unixfs": "^4.0.2",
+    "@poanet/solidity-flattener": "^3.0.9",
     "axios": "^1.7.9",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
